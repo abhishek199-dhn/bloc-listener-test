@@ -1,4 +1,5 @@
 import "dart:async";
+import 'dart:math';
 
 import "package:bloc/bloc.dart";
 
@@ -14,11 +15,17 @@ class UserBloc extends Bloc<UserEvent, UserState> {
   Stream<UserState> mapEventToState(UserEvent event) async* {
     print("event" + event.toString());
     if (event is GetLoggedInUserEvent) {
-      // Emit either Loaded or Error
       try {
         yield UserLoading();
 
-        yield UserLoaded(isUserLoaded: true);
+        await Future<void>.delayed(const Duration(seconds: 2));
+        bool userLoaded = Random().nextInt(100) % 2 == 0;
+
+        if (userLoaded) {
+          yield UserLoaded(isUserLoaded: true);
+        } else {
+          yield UserLoggedOut();
+        }
       } on Error {
         yield UserError(message: "There is an error running the app.");
       }
