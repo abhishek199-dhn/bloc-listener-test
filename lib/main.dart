@@ -10,57 +10,52 @@ final Map<String, WidgetBuilder> routes = <String, WidgetBuilder>{
 };
 
 void main() {
-  runApp(MyApp());
+  runApp(BlocProvider(
+    create: (BuildContext context) => UserBloc()..add(GetLoggedInUserEvent()),
+    child: MyApp(),
+  ));
 }
 
 class MyApp extends StatelessWidget {
-  // This widget is the root of your application.
+  final _navigatorKey = GlobalKey<NavigatorState>();
+
+  NavigatorState get _navigator => _navigatorKey.currentState;
   @override
   Widget build(BuildContext context) {
-    // global user bloc
-    return MultiBlocProvider(
-      providers: [
-        BlocProvider<UserBloc>(
-          create: (BuildContext context) => UserBloc()
-            ..add(
-              GetLoggedInUserEvent(),
-            ),
-        ),
-      ],
-      child: MaterialApp(
-        title: 'Flutter Demo',
-        theme: ThemeData(
-          primarySwatch: Colors.blue,
-          visualDensity: VisualDensity.adaptivePlatformDensity,
-        ),
-        routes: routes,
-        home: SplashPage(),
+    return MaterialApp(
+      title: 'Flutter Demo',
+      navigatorKey: _navigatorKey,
+      theme: ThemeData(
+        primarySwatch: Colors.blue,
+        visualDensity: VisualDensity.adaptivePlatformDensity,
       ),
+      routes: routes,
+      builder: (context, widget) {
+        return BlocListener<UserBloc, UserState>(
+          listener: (context, state) {
+            if (state is UserLoaded) {
+              _navigator.pushAndRemoveUntil(MyHomePage.route(), (route) => false);
+            } else if (state is UserLoggedOut) {
+              _navigator.pushAndRemoveUntil(AuthScreen.route(), (route) => false);
+            }
+          },
+          child: widget,
+        );
+      },
+      onGenerateRoute: (_) => SplashPage.route(),
     );
   }
 }
 
 class SplashPage extends StatelessWidget {
+  static Route route() {
+    return MaterialPageRoute(builder: (_) => SplashPage());
+  }
+
   @override
   Widget build(BuildContext context) {
-    return BlocListener<UserBloc, UserState>(
-      listener: (BuildContext context, UserState state) {
-        // this bloc listener gets called when the event is fired from the home page
-        // even when this route is not in the route stack.
-
-        print("UserBlocListener");
-        if (state is UserLoaded) {
-          if (state.isUserLoaded == true) {
-            // removing all the prev routes
-            Navigator.pushNamedAndRemoveUntil(
-              context,
-              "/home",
-              (Route<dynamic> route) => false,
-            );
-          }
-        }
-      },
-      child: Center(
+    return Scaffold(
+      body: Center(
         child: CircularProgressIndicator(),
       ),
     );
@@ -68,20 +63,16 @@ class SplashPage extends StatelessWidget {
 }
 
 class MyHomePage extends StatefulWidget {
+  static Route route() {
+    return MaterialPageRoute(builder: (_) => MyHomePage());
+  }
+
   @override
   _MyHomePageState createState() => _MyHomePageState();
 }
 
 class _MyHomePageState extends State<MyHomePage> {
   int _counter = 0;
-
-  @override
-  void initState() {
-    // need to fire this event again in case when user comes from this flow (to get the user in home):
-    // splash -> user not found -> login -> home
-    BlocProvider.of<UserBloc>(context).add(GetLoggedInUserEvent());
-    super.initState();
-  }
 
   void _incrementCounter() {
     setState(() {
@@ -111,9 +102,39 @@ class _MyHomePageState extends State<MyHomePage> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _incrementCounter,
-        tooltip: 'Increment',
         child: Icon(Icons.add),
-      ), // This trailing comma makes auto-formatting nicer for build methods.
+      ),
+    );
+  }
+}
+
+class AuthScreen extends StatelessWidget {
+  static Route route() {
+    return MaterialPageRoute(
+      builder: (_) => AuthScreen(),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Auth Page')),
+      body: Center(
+        child: BlocBuilder<UserBloc, UserState>(
+          builder: (context, state) {
+            if (state is UserLoading) {
+              return CircularProgressIndicator();
+            }
+
+            return RaisedButton(
+              onPressed: () {
+                BlocProvider.of<UserBloc>(context).add(GetLoggedInUserEvent());
+              },
+              child: Text('Login'),
+            );
+          },
+        ),
+      ),
     );
   }
 }
